@@ -1,0 +1,20 @@
+{
+  "name": "now-i",
+  "version": "0.0.1",
+  "homepage": "https://github.com/khrome/now-i",
+  "description": "Productivity without projection",
+  "author": "Abbey Hawk Sparrow <@khrome> (http://patternweaver.com)",
+  "contributors": [],
+  "bugs": {
+    "url": "https://github.com/khrome/now-i/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/khrome/now-i.git"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^6.2.0"
+  }
+}
