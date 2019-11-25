@@ -70,7 +70,7 @@ If I want to see what items are left unfinished:
 now-i work --for scope…my-project
 ```
 
-![work-output](docs/ouput.png)
+![work-output](docs/output.png)
 
 `--output-format` supports `json`, `json-pretty`, `ansi-table` and [TBD]`csv`
 
