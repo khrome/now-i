@@ -1,8 +1,16 @@
 {
   "name": "now-i",
-  "version": "0.0.1",
-  "homepage": "https://github.com/khrome/now-i",
-  "description": "Productivity without projection",
+  "version": "0.0.2",
+  "description": "Track your progress on tasks, without setup or planning",
+  "keywords": [
+    "todo",
+    "tracker",
+    "work",
+    "productivity",
+    "command-line",
+    "shell",
+    "task"
+  ],
   "author": "Abbey Hawk Sparrow <@khrome> (http://patternweaver.com)",
   "contributors": [],
   "bugs": {
@@ -13,8 +21,19 @@
     "type": "git",
     "url": "git://github.com/khrome/now-i.git"
   },
-  "devDependencies": {
+  "engines": {
+    "node": "*"
+  },
+  "bin": "./bin/now-i",
+  "dependencies": {
+    "ascii-art": "^2.1.6",
+    "async": "^3.1.0",
     "chai": "^4.2.0",
-    "mocha": "^6.2.0"
+    "home": "^2.0.0",
+    "mocha": "^6.2.2",
+    "moment": "^2.24.0",
+    "recursive-readdir": "^2.2.2",
+    "uuid": "^3.3.3",
+    "yargs": "^15.0.2"
   }
 }

@@ -1,0 +1,349 @@
+#!/usr/bin/env node
+var argv;
+var yargs = require('yargs');
+var fs = require('fs');
+var asynk = require('async');
+var uuid = require('uuid');
+var art = require('ascii-art');
+var home = require('home');
+var moment = require('moment');
+var recursive = require("recursive-readdir");
+var Now = require('../now');
+if(!Object.filter) Object.filter = function(obj, predicate){
+    var result = {};
+    var key;
+    for(key in obj) if( obj.hasOwnProperty(key) && !predicate(obj[key]) ){
+        result[key] = obj[key];
+    }
+    return result;
+};
+
+if(!Object.map) Object.map = function(obj, predicate){
+    var result = {};
+    var key;
+    for(key in obj) if( obj.hasOwnProperty(key)){
+        result[key] = predicate(obj[key], key);
+    }
+    return result;
+};
+
+yargs.usage('Usage: $0 <command> [options]')
+yargs.command('did', 'convert an image to ascii')
+    .command('search', 'search for some segment of the data')
+    .command('work', 'list the open projects and their status')
+    .command('know', 'aggregate the input data segment')
+    .command('learn', 'want + know + cache(the segment)')
+    .command('see', 'visualize your historical data')
+    .command('configure', 'configure the application')
+    .demand(2)
+    .example(
+        '$0 did --activity prototype --scope my-project --add-complete 3 ',
+        'add 3 work units to "prototype:my-project"'
+    )
+    .example(
+        '$0 want --with "activity:prototype"',
+        'load all events with .activity = "prototype"'
+    )
+    .alias('a', 'activity')
+        .nargs('a', 1)
+        .describe('a', 'the thing you did')
+    .alias('d', 'data-directory')
+        .nargs('d', 1)
+        .describe('d', 'use an alternate directory, instead of the home folder')
+    .alias('x', 'taxonomy')
+        .nargs('x', 1)
+        .describe('x', 'A hierarchical taxonomy of colon separated concepts')
+    .alias('m', 'meta')
+    .alias('m', 'metadata')
+        .nargs('m', 1)
+        .describe('m', 'a piece of metadata of the form name=value')
+    .alias('o', 'output-format')
+        .nargs('o', 1)
+        .choices('o', ['json', 'pretty-json', 'table', 'ansi-table'])
+        .describe('o', 'How you want the data to be formatted (or not)')
+    .alias('i', 'iteration')
+        .nargs('i', 1)
+        .describe('i', 'for a repeated task, what sequence number are we doing now')
+    .alias('c', 'complete')
+        .nargs('c', 1)
+        .describe('c', 'set the currently completed amount of work')
+    .alias('t', 'total')
+        .nargs('t', 1)
+        .describe('t', 'total amount of work to be done on this task')
+    .alias('I', 'add-iteration')
+        .nargs('I', 1)
+        .describe('I', 'add to the sequence number of a repeated task')
+    .alias('C', 'add-complete')
+        .nargs('C', 1)
+        .describe('C', 'add to the currently completed amount of work')
+    .alias('T', 'add-total')
+        .nargs('T', 1)
+        .describe('T', 'add to the total amount of work to be done on this task')
+    .alias('y', 'type')
+        .nargs('y', 1)
+        .describe('y', 'The context of work being done')
+    .alias('s', 'scope')
+        .nargs('s', 1)
+        .describe('s', 'the scope of the work done (personal/public/private/<project name>)')
+    .alias('g', 'magnitude')
+        .nargs('g', 1)
+        .describe('g', 'the comparative size or scale of this objective')
+    .alias('f', 'for')
+        .nargs('f', 1)
+        .describe('f', 'segment the dataset using the provided criterion')
+    .help('h')
+    .alias('h', 'help')
+    .epilog('©2016 - Abbey Hawk Sparrow');
+argv = yargs.argv;
+var action = argv._.shift();
+
+var rootDirectory = argv.d || '~/.now-i';
+
+var ensureExists = function(path, mask, cb) {
+    fs.stat(path, function(err){
+        if(err){
+            fs.mkdir(path, mask, function(err) {
+                if (err) cb(err); // something else went wrong
+                else cb(undefined); // successfully created folder
+            });
+        }else cb(undefined);
+    });
+}
+
+var handleOutput = function(data, def){
+    if(data.collations){
+        if(!Object.keys(data.collations).length){
+            console.log("NO DATA");
+        }else{
+            if(argv.o){
+                switch(argv.o){
+                    case 'ansi-table':
+                    case 'table':
+                        var tdata = Object.keys(data.collations).map(function(key){
+                            return data.collations[key];
+                        });
+                        var thead = Object.keys(tdata[0]).map(function(key){
+                            return {
+                                value : key,
+                                style : 'white'
+                            };
+                        });
+                        if(argv.o) art.table({
+                            width : 120,
+                            data : tdata,
+                            headerStyle : 'yellow',
+                            bars : 'double',
+                            includeHeader: true,
+                            dataStyle : 'bright_white',
+                            borderColor : 'gray',
+                            columns : thead
+                        }, function(rendered){
+                            // use rendered text
+                            console.log(rendered);
+                        });
+                        break;
+                    case 'json':
+                        console.log(JSON.stringify(data));
+                        break;
+                    case 'pretty-json':
+                        console.log(JSON.stringify(data, undefined, '    '));
+                        break;
+                    default : throw new Error('Unknown output mode:'+argv.o)
+                }
+            }else{
+                argv.o = def;
+                handleOutput(data, def || 'json')
+            }
+        }
+    }
+}
+
+
+var ensureHomeFolder = function(callback){
+    var dir = home.resolve(rootDirectory);
+    ensureExists(dir, 0744, function(err) {
+        if (err) return callback(err);
+        ensureExists(dir+'/data', 0744, function(err) {
+            if (err) return callback(err);
+            callback(err, dir);
+        });
+    });
+}
+
+var tryOperatorParse = function(operator, line){
+    if(line.indexOf(operator) !== -1){
+        var parts = line.split(operator);
+        return {
+            name : parts[0],
+            operator : operator,
+            value : parts[1]
+        }
+    }
+    return undefined;
+}
+
+var handleFilters = function(data){
+    var result = data;
+    var filters = (
+        ( argv.f && Array.isArray(argv.f)?argv.f:[argv.f]) || []
+    ).filter(function(line){
+        return line !== undefined;
+    }).map(function(line){
+        var result;
+        result = tryOperatorParse('=', line);
+        if(result) return result;
+        result = tryOperatorParse('…', line);
+        if(result) return result;
+    });
+    if(filters.length) result = data.filter(function(item){
+        var res =  filters.reduce(function(agg, filter){
+            if(agg) return agg;
+            if(filter.operator === '…' && filter.name && filter.value){
+                var targetParts = item.data[filter.name].split(':');
+                var matchParts = filter.value.split(':');
+                if(matchParts.length > matchParts.length) return false;
+                return matchParts.reduce(function(agg, part, index){
+                    return agg && (part === targetParts[index]);
+                }, true);
+            }
+            if(filter.operator === '=' && filter.name && filter.value){
+                if(item.data[filter.name] === filter.value) return true;
+            }
+            return agg;
+        }, false);
+        return res;
+    });
+    return result;
+}
+
+var loadConfig = function(dir, callback){
+    fs.readFile(dir+'/config.json', function(err, buff){
+        if(err){
+            if(err.code === 'ENOENT'){
+                return callback(undefined, {});
+            }else{
+                return callback(ex);
+            }
+        }
+        try{
+            var data = JSON.parse(buff);
+            callback(undefined, data);
+        }catch(ex){
+            return callback(ex);
+        }
+
+    })
+}
+
+var loadData = function(dir, callback){
+    recursive(dir, function (err, files){
+      var results = [];
+      asynk.eachOfSeries(files, function(file, index, done){
+          //todo: filter to only JSON
+          fs.readFile(file, function(err, body){
+              var data = JSON.parse(body);
+              results.push(new Now.I(data));
+              done();
+          })
+      }, function(){
+          callback(undefined, results);
+      });
+    });
+}
+
+var loadOrSetupHomeFolder = function(callback){
+    //ensure dirs
+    ensureHomeFolder(function(err, dir){
+        if(err) return callback(err);
+        //get config
+        loadConfig(dir, function(err, config){
+            if(err) return callback(err);
+            //todo: check cache
+            //load all the data
+            loadData(dir+'/data', function(err, data){
+                if(err) return callback(err);
+                callback(undefined, dir, config, data);
+            });
+        });
+    });
+}
+
+var writeData = function(dir, data, cb){
+    var date = moment();
+    var id = uuid.v4();
+    var thisDir = dir+'/data/'+date.format("YYYY");
+    data.date = date.format("YYYY-MM-DD HH:mm:ss");
+    ensureExists(thisDir, 0744, function(){
+        thisDir = dir+'/data/'+date.format("YYYY")+'/'+date.format("DD");
+        ensureExists(thisDir, 0744, function(){
+            fs.writeFile(
+                thisDir+'/'+id+'.json',
+                JSON.stringify(data),
+                function(err){
+                    if(err) throw err;
+                    if(cb) cb(undefined, id);
+                    console.log('Wrote '+id);
+
+                }
+            );
+        });
+    });
+    return id;
+}
+
+loadOrSetupHomeFolder(function(err, dir, config, data){
+    if(err) throw err;
+    switch(action){
+        case 'did':
+            var newItemData = {};
+            if(argv.a) newItemData.activity = argv.a;
+            if(argv.x) newItemData.taxonomy = argv.x;
+            if(argv.i) newItemData.iteration = argv.i;
+            if(argv.c) newItemData.complete = argv.c;
+            if(argv.t) newItemData.total = argv.t;
+            if(argv.g) newItemData.magnitude = argv.g;
+            if(argv.y) newItemData.type = argv.y;
+            if(argv.s) newItemData.scope = argv.s;
+            if(!Object.keys(newItemData).length){
+                throw new Error('No Data Set!');
+            }
+            if(argv.C || argv.I || argv.T || argv.G){
+                //mutation detected, load current states
+                var collection = new Now.Collection(data);
+                collection.collate(function(err, data, grouper){
+                    var groupName = grouper(new Now.I(newItemData));
+                    var item = data[groupName];
+                    if(argv.C) newItemData.complete = argv.C + item.complete;
+                    if(argv.I) newItemData.iteration = argv.I + item.iteration;
+                    if(argv.T) newItemData.total = argv.T + item.total;
+                    if(argv.G) newItemData.magnitude = argv.G + item.magnitude;
+                    writeData(dir, newItemData);
+                });
+            }else{
+                writeData(dir, newItemData);
+            }
+
+            break;
+        case 'search':
+            data = handleFilters(data);
+            var collection = new Now.Collection(data);
+            collection.collate(function(err, data){
+                handleOutput({collations:data});
+            });
+            break;
+        case 'work':
+            data = handleFilters(data);
+            var collection = new Now.Collection(data);
+            collection.collate(function(err, data){
+                data = Object.filter(data, function(item){
+                    if(item.complete && item.total){
+                        if(item.complete >= item.total) return true;
+                    }
+                    return false;
+                });
+                handleOutput({collations:data}, 'table');
+            });
+            break;
+        default : throw new Error('unknown action: '+action);
+    }
+});
