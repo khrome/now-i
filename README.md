@@ -38,6 +38,14 @@ Final Model
         - professional social network
         - coding profile
 
+Usage centers around a few simple verbs:
+
+- `now-i did`        convert an image to ascii
+- `now-i want`       search for some segment of the data
+- `now-i will`       list the open projects and their status
+- `now-i know`       aggregate the input data segment
+- `now-i see`        visualize your historical data
+
 
 A Sample Quickstart
 -------------------
@@ -60,14 +68,14 @@ now-i did --activity=design --scope=my-project:ui-spec --complete=2
 
 Now let's look and see what we've done on the project thusfar:
 ```bash
-now-i search --for scope…my-project
+now-i want --for scope…my-project
 ```
 
 table here
 
 If I want to see what items are left unfinished:
 ```bash
-now-i work --for scope…my-project
+now-i will --for scope…my-project
 ```
 
 ![work-output](docs/output.png)

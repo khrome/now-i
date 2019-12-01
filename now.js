@@ -59,6 +59,7 @@ Now.I.prototype.reconcile = function(object, analytics){
     Object.keys(this.data).forEach(function(key){
         object[key] = Now.collations[key](data[key], object[key], data, object);
     });
+
     return object;
 }
 
@@ -91,13 +92,15 @@ Now.Collection.prototype.collate = function(gp, cb){
     }, function(){
         //data is now assembled and ready to process
         var results = {};
+        var history = {};
         asynk.eachOfSeries(Object.keys(ob.collations), function(key, index, done){
-                ob.collations[key].collate(function(){
-                    results[key] = ob.collations[key].data;
-                    done();
-                });
+            ob.collations[key].collate(function(){
+                results[key] = ob.collations[key].data;
+                history[key] = ob.collations[key].history;
+                done();
+            });
         }, function(){
-            callback(undefined, results, grouper);
+            callback(undefined, results, history, grouper);
         });
     })
 }
@@ -105,6 +108,7 @@ Now.Collection.prototype.collate = function(gp, cb){
 Now.Collation = function(){ //the current state of any particular thing
     this.events = [];
     this.unreconciled = [];
+    this.history = [];
     this.data = {};
 }
 
@@ -117,7 +121,8 @@ Now.Collation.prototype.collate = function(cb){
     var ob = this;
     while(this.unreconciled.length){ //safest for recovery
         event = this.unreconciled.shift();
-        ob.data = event.reconcile(ob.data)
+        ob.data = event.reconcile(ob.data);
+        ob.history.push(JSON.parse(JSON.stringify(ob.data)));
     }
     cb();
 }

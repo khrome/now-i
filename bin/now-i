@@ -4,6 +4,8 @@ var yargs = require('yargs');
 var fs = require('fs');
 var asynk = require('async');
 var uuid = require('uuid');
+var Graph = require('ascii-art-graph');
+
 var art = require('ascii-art');
 var home = require('home');
 var moment = require('moment');
@@ -28,21 +30,21 @@ if(!Object.map) Object.map = function(obj, predicate){
 };
 
 yargs.usage('Usage: $0 <command> [options]')
-yargs.command('did', 'convert an image to ascii')
-    .command('search', 'search for some segment of the data')
-    .command('work', 'list the open projects and their status')
+yargs.command('did', 'file a piece of work done')
+    .command('want', 'search for some segment of the data')
+    .command('will', 'list the open projects and their status')
     .command('know', 'aggregate the input data segment')
     .command('learn', 'want + know + cache(the segment)')
     .command('see', 'visualize your historical data')
     .command('configure', 'configure the application')
-    .demand(2)
+    .demand(1)
     .example(
         '$0 did --activity prototype --scope my-project --add-complete 3 ',
         'add 3 work units to "prototype:my-project"'
     )
     .example(
-        '$0 want --with "activity:prototype"',
-        'load all events with .activity = "prototype"'
+        '$0 want --with "scope…prototype"',
+        'load all events who\'s scope begins with "prototype"'
     )
     .alias('a', 'activity')
         .nargs('a', 1)
@@ -310,7 +312,7 @@ loadOrSetupHomeFolder(function(err, dir, config, data){
             if(argv.C || argv.I || argv.T || argv.G){
                 //mutation detected, load current states
                 var collection = new Now.Collection(data);
-                collection.collate(function(err, data, grouper){
+                collection.collate(function(err, data, history, grouper){
                     var groupName = grouper(new Now.I(newItemData));
                     var item = data[groupName];
                     if(argv.C) newItemData.complete = argv.C + item.complete;
@@ -325,23 +327,43 @@ loadOrSetupHomeFolder(function(err, dir, config, data){
 
             break;
         case 'search':
+        case 'want':
             data = handleFilters(data);
             var collection = new Now.Collection(data);
-            collection.collate(function(err, data){
-                handleOutput({collations:data});
+            collection.collate(function(err, data, history){
+                handleOutput({collations: data, timeseries: history});
             });
             break;
+        case 'see':
+            data = handleFilters(data);
+            var  collection = new Now.Collection(data);
+            collection.collate(function(err, data, history){
+                var graph = new Graph.Timeseries({
+                    height : 20,
+                    width : 80,
+                    node : '@',
+                    line : '`',
+                    //timeField : 'modification-date',
+                    valueField : 'complete',
+                    colors : ['red', 'blue', 'green']
+                });
+                graph.braille(history, function(err, result){
+                    console.log(result);
+                });
+            });
+            break;
+        case 'will':
         case 'work':
             data = handleFilters(data);
             var collection = new Now.Collection(data);
-            collection.collate(function(err, data){
+            collection.collate(function(err, data, history){
                 data = Object.filter(data, function(item){
                     if(item.complete && item.total){
                         if(item.complete >= item.total) return true;
                     }
                     return false;
                 });
-                handleOutput({collations:data}, 'table');
+                handleOutput({collations: data, timeseries: history}, 'table');
             });
             break;
         default : throw new Error('unknown action: '+action);
