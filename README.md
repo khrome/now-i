@@ -9,7 +9,7 @@ I think we waste a massive amount of effort rationalizing our projections of idy
 
 I would like to forward the un-radical idea that only work that is done actually matters, and that mingling work tracking(something that should have hard data) and project planning(something with softer, more ephemeral data and less concrete goals) **only** benefits the companies that provide tools to facilitate this process and their partner networks of affiliates, experts, event planners and third party implementors. By separating work tracking, we get something simple and reliable, without subjecting that work to the constant flux of wishful projections.
 
-Someday this may intersect a forcasting tool, but it will never internalize that forcast data.
+Someday this may intersect a forecasting tool, but it will never internalize that forecast data.
 
 It looks something like this:
 
